@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+
+<div class="row">
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">Total Participantes</h5>
+                <h2 class="display-4">{{ total_participantes }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">Calificaciones Registradas</h5>
+                <h2 class="display-4">{{ total_calificaciones }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">Promedio General</h5>
+                <h2 class="display-4">{{ promedio_general }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">Categorías</h5>
+                <h2 class="display-4">2</h2>
+                <small>A y B</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Participantes por Categoría</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Categoría</th>
+                            <th>Cantidad</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in participantes_por_categoria %}
+                        <tr>
+                            <td>Categoría {{ item.categoria }}</td>
+                            <td><span class="badge bg-primary">{{ item.total }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Acciones Rápidas</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('participantes') }}" class="btn btn-primary">
+                        <i class="bi bi-person-plus"></i> Registrar Participante
+                    </a>
+                    <a href="{{ url_for('calificaciones') }}" class="btn btn-success">
+                        <i class="bi bi-star"></i> Registrar Calificaciones
+                    </a>
+                    <a href="{{ url_for('resultados') }}" class="btn btn-info">
+                        <i class="bi bi-bar-chart"></i> Ver Resultados
+                    </a>
+                    <a href="{{ url_for('resultados_publicos') }}" class="btn btn-warning" target="_blank">
+                        <i class="bi bi-eye"></i> Ver Público
+                    </a>
+                    <a href="{{ url_for('exportar_excel') }}" class="btn btn-secondary">
+                        <i class="bi bi-file-excel"></i> Exportar a Excel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

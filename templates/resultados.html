@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2><i class="bi bi-bar-chart"></i> Resultados por Categoría</h2>
+
+<div class="row">
+    {% for categoria, participantes in resultados.items() %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-{% if categoria == 'A' %}primary{% else %}warning{% endif %} text-white">
+                <h4 class="mb-0">Categoría {{ categoria }}</h4>
+            </div>
+            <div class="card-body">
+                {% if participantes %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Posición</th>
+                                <th>Institución</th>
+                                <th>Danza</th>
+                                <th>Promedio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in participantes %}
+                            <tr>
+                                <td>
+                                    {% if p.posicion == 1 %}
+                                        <span class="badge bg-warning">🥇 1°</span>
+                                    {% elif p.posicion == 2 %}
+                                        <span class="badge bg-secondary">🥈 2°</span>
+                                    {% elif p.posicion == 3 %}
+                                        <span class="badge bg-danger">🥉 3°</span>
+                                    {% else %}
+                                        <span class="badge bg-info">{{ p.posicion }}°</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ p.nombre_institucion }}</td>
+                                <td>{{ p.nombre_danza }}</td>
+                                <td><strong>{{ "%.2f"|format(p.puntaje_total) }}</strong></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    No hay participantes con calificaciones en esta categoría.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('exportar_excel') }}" class="btn btn-success">
+        <i class="bi bi-file-excel"></i> Exportar a Excel
+    </a>
+    <a href="{{ url_for('resultados_publicos') }}" class="btn btn-info" target="_blank">
+        <i class="bi bi-eye"></i> Ver Público
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people"></i> Participantes</h2>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalParticipante">
+        <i class="bi bi-person-plus"></i> Nuevo Participante
+    </button>
+</div>
+
+<!-- Tabla de participantes -->
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Institución</th>
+                <th>Danza</th>
+                <th>Categoría</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in participantes %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>{{ p.nombre_institucion }}</td>
+                <td>{{ p.nombre_danza }}</td>
+                <td><span class="badge bg-{% if p.categoria == 'A' %}primary{% else %}warning{% endif %}">
+                    Categoría {{ p.categoria }}
+                </span></td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="editarParticipante({{ p.id }}, '{{ p.nombre_institucion }}', '{{ p.nombre_danza }}', '{{ p.categoria }}')">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <a href="{{ url_for('eliminar_participante', id=p.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('¿Está seguro de eliminar este participante?')">
+                        <i class="bi bi-trash"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- MODAL PARA AGREGAR/EDITAR -->
+<div class="modal fade" id="modalParticipante" tabindex="-1" aria-labelledby="modalParticipanteLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalParticipanteLabel">
+                    <i class="bi bi-person-plus"></i> Registrar Participante
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formParticipante" method="POST" action="{{ url_for('agregar_participante') }}">
+                <div class="modal-body">
+                    <input type="hidden" id="participante_id" name="participante_id" value="">
+                    
+                    <div class="mb-3">
+                        <label for="nombre_institucion" class="form-label">Nombre de la Institución</label>
+                        <input type="text" class="form-control" id="nombre_institucion" name="nombre_institucion" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="nombre_danza" class="form-label">Nombre de la Danza</label>
+                        <input type="text" class="form-control" id="nombre_danza" name="nombre_danza" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="categoria" class="form-label">Categoría</label>
+                        <select class="form-select" id="categoria" name="categoria" required>
+                            <option value="A">Categoría A</option>
+                            <option value="B">Categoría B</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Función para editar participante
+function editarParticipante(id, institucion, danza, categoria) {
+    // Cambiar título del modal
+    document.querySelector('#modalParticipante .modal-title').innerHTML = '<i class="bi bi-pencil"></i> Editar Participante';
+    
+    // Llenar los campos
+    document.getElementById('participante_id').value = id;
+    document.getElementById('nombre_institucion').value = institucion;
+    document.getElementById('nombre_danza').value = danza;
+    document.getElementById('categoria').value = categoria;
+    
+    // Cambiar la acción del formulario
+    document.getElementById('formParticipante').action = "{{ url_for('editar_participante', id=0) }}".replace('0', id);
+    
+    // Mostrar el modal
+    var modal = new bootstrap.Modal(document.getElementById('modalParticipante'));
+    modal.show();
+}
+
+// Resetear formulario al cerrar el modal
+document.getElementById('modalParticipante').addEventListener('hidden.bs.modal', function() {
+    // Restaurar título
+    document.querySelector('#modalParticipante .modal-title').innerHTML = '<i class="bi bi-person-plus"></i> Registrar Participante';
+    
+    // Resetear formulario
+    document.getElementById('formParticipante').reset();
+    document.getElementById('participante_id').value = '';
+    document.getElementById('formParticipante').action = "{{ url_for('agregar_participante') }}";
+});
+
+// Debug: Verificar que el formulario se envía correctamente
+document.getElementById('formParticipante').addEventListener('submit', function(e) {
+    console.log('Formulario enviado');
+    console.log('Método:', this.method);
+    console.log('Action:', this.action);
+    console.log('Datos:', new FormData(this));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2><i class="bi bi-file-text"></i> Reporte de Resultados</h2>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover" id="tablaReporte">
+        <thead class="table-dark">
+            <tr>
+                <th>Categoría</th>
+                <th>Posición</th>
+                <th>Institución</th>
+                <th>Danza</th>
+                <th>Jurado 1</th>
+                <th>Jurado 2</th>
+                <th>Jurado 3</th>
+                <th>Promedio</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in reporte %}
+            <tr>
+                <td><span class="badge bg-{% if item.categoria == 'A' %}primary{% else %}warning{% endif %}">
+                    {{ item.categoria }}
+                </span></td>
+                <td>
+                    {% if item.posicion == 1 %}
+                        <span class="badge bg-warning">🥇 1°</span>
+                    {% elif item.posicion == 2 %}
+                        <span class="badge bg-secondary">🥈 2°</span>
+                    {% elif item.posicion == 3 %}
+                        <span class="badge bg-danger">🥉 3°</span>
+                    {% else %}
+                        <span class="badge bg-info">{{ item.posicion }}°</span>
+                    {% endif %}
+                </td>
+                <td>{{ item.nombre_institucion }}</td>
+                <td>{{ item.nombre_danza }}</td>
+                <td>{{ "%.2f"|format(item.jurado1) }}</td>
+                <td>{{ "%.2f"|format(item.jurado2) }}</td>
+                <td>{{ "%.2f"|format(item.jurado3) }}</td>
+                <td><strong>{{ "%.2f"|format(item.puntaje_total) }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('exportar_excel') }}" class="btn btn-success">
+        <i class="bi bi-file-excel"></i> Exportar a Excel
+    </a>
+</div>
+{% endblock %}

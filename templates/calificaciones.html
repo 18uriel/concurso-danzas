@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2><i class="bi bi-star"></i> Calificaciones</h2>
+<p class="text-muted">Registre las calificaciones de los 3 jurados (0 a 100 puntos). El <strong>promedio</strong> se calculará automáticamente.</p>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Categoría</th>
+                <th>Institución</th>
+                <th>Danza</th>
+                <th>Jurado 1</th>
+                <th>Jurado 2</th>
+                <th>Jurado 3</th>
+                <th>Promedio</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in participantes %}
+            <tr>
+                <td><span class="badge bg-{% if p.categoria == 'A' %}primary{% else %}warning{% endif %}">
+                    {{ p.categoria }}
+                </span></td>
+                <td>{{ p.nombre_institucion }}</td>
+                <td>{{ p.nombre_danza }}</td>
+                <form method="POST" action="{{ url_for('guardar_calificacion', participante_id=p.id) }}">
+                    <td>
+                        <input type="number" class="form-control form-control-sm calificacion" 
+                               step="0.01" min="0" max="100" 
+                               name="jurado1" value="{{ p.jurado1 if p.jurado1 is not none else '' }}"
+                               style="width: 80px;" required>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm calificacion" 
+                               step="0.01" min="0" max="100" 
+                               name="jurado2" value="{{ p.jurado2 if p.jurado2 is not none else '' }}"
+                               style="width: 80px;" required>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm calificacion" 
+                               step="0.01" min="0" max="100" 
+                               name="jurado3" value="{{ p.jurado3 if p.jurado3 is not none else '' }}"
+                               style="width: 80px;" required>
+                    </td>
+                    <td>
+                        <strong class="puntaje-total">
+                            {% if p.jurado1 is not none and p.jurado2 is not none and p.jurado3 is not none %}
+                                {{ "%.2f"|format((p.jurado1 + p.jurado2 + p.jurado3) / 3) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </strong>
+                    </td>
+                    <td>
+                        <button type="submit" class="btn btn-sm btn-success">
+                            <i class="bi bi-save"></i> Guardar
+                        </button>
+                    </td>
+                </form>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+// Calcular promedio automáticamente
+document.querySelectorAll('.calificacion').forEach(input => {
+    input.addEventListener('input', function() {
+        const row = this.closest('tr');
+        const jurado1 = parseFloat(row.querySelector('[name="jurado1"]').value) || 0;
+        const jurado2 = parseFloat(row.querySelector('[name="jurado2"]').value) || 0;
+        const jurado3 = parseFloat(row.querySelector('[name="jurado3"]').value) || 0;
+        const promedio = (jurado1 + jurado2 + jurado3) / 3;
+        row.querySelector('.puntaje-total').textContent = promedio.toFixed(2);
+    });
+});
+
+// Validar que el valor esté entre 0 y 100
+document.querySelectorAll('.calificacion').forEach(input => {
+    input.addEventListener('blur', function() {
+        const valor = parseFloat(this.value);
+        if (isNaN(valor) || valor < 0) {
+            this.value = 0;
+            this.classList.add('is-invalid');
+        } else if (valor > 100) {
+            this.value = 100;
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+        this.dispatchEvent(new Event('input'));
+    });
+});
+</script>
+{% endblock %}

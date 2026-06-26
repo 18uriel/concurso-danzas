@@ -8,23 +8,37 @@
      FILTRO Y BOTONES
      ========================================== -->
 <div class="row mb-3">
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="input-group">
             <span class="input-group-text"><i class="bi bi-search"></i></span>
             <input type="text" id="filtroBusqueda" class="form-control" placeholder="Filtrar por institución o danza...">
             <button class="btn btn-outline-secondary" type="button" onclick="limpiarFiltro()">
-                <i class="bi bi-x-circle"></i> Limpiar
+                <i class="bi bi-x-circle"></i>
             </button>
         </div>
     </div>
-    <div class="col-md-6 text-end">
-        <button class="btn btn-primary" onclick="imprimirTabla()">
-            <i class="bi bi-printer"></i> Imprimir / PDF
+    <div class="col-md-8 text-end">
+        <button class="btn btn-sm btn-outline-primary" onclick="seleccionarTodos()">
+            <i class="bi bi-check-all"></i> Seleccionar todos
         </button>
-        <button class="btn btn-success" onclick="exportarExcelFiltrado()">
-            <i class="bi bi-file-excel"></i> Exportar Excel
+        <button class="btn btn-sm btn-outline-secondary" onclick="deseleccionarTodos()">
+            <i class="bi bi-x-circle"></i> Deseleccionar
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="imprimirSeleccionados()">
+            <i class="bi bi-printer"></i> Imprimir selección
+        </button>
+        <button class="btn btn-sm btn-success" onclick="exportarSeleccionados()">
+            <i class="bi bi-file-excel"></i> Excel selección
+        </button>
+        <button class="btn btn-sm btn-warning" onclick="eliminarSeleccionados()">
+            <i class="bi bi-trash"></i> Eliminar selección
         </button>
     </div>
+</div>
+
+<!-- Contador de seleccionados -->
+<div class="alert alert-info mb-3" id="contadorSeleccionados" style="display: none;">
+    <i class="bi bi-info-circle"></i> <span id="numeroSeleccionados">0</span> participante(s) seleccionado(s)
 </div>
 
 <!-- ==========================================
@@ -34,6 +48,9 @@
     <table class="table table-striped table-hover" id="tablaCalificaciones">
         <thead class="table-dark">
             <tr>
+                <th style="width: 40px;">
+                    <input type="checkbox" id="seleccionarTodosCheckbox" onchange="toggleSeleccionarTodos(this)">
+                </th>
                 <th>Categoría</th>
                 <th>Institución</th>
                 <th>Danza</th>
@@ -46,13 +63,16 @@
         </thead>
         <tbody>
             {% for p in participantes %}
-            <tr class="fila-participante" data-institucion="{{ p.nombre_institucion|lower }}" data-danza="{{ p.nombre_danza|lower }}">
+            <tr class="fila-participante" data-institucion="{{ p.nombre_institucion|lower }}" data-danza="{{ p.nombre_danza|lower }}" data-id="{{ p.id }}">
+                <td>
+                    <input type="checkbox" class="checkbox-participante" data-id="{{ p.id }}" onchange="actualizarContador()">
+                </td>
                 <td><span class="badge bg-{% if p.categoria == 'A' %}primary{% else %}warning{% endif %}">
                     {{ p.categoria }}
                 </span></td>
                 <td class="texto-institucion">{{ p.nombre_institucion }}</td>
                 <td class="texto-danza">{{ p.nombre_danza }}</td>
-                <form method="POST" action="{{ url_for('guardar_calificacion', participante_id=p.id) }}">
+                <form method="POST" action="{{ url_for('guardar_calificacion', participante_id=p.id) }}" class="form-calificacion" data-id="{{ p.id }}">
                     <td>
                         <input type="number" class="form-control form-control-sm calificacion" 
                                step="0.01" min="0" max="100" 
@@ -82,7 +102,7 @@
                     </td>
                     <td>
                         <button type="submit" class="btn btn-sm btn-success">
-                            <i class="bi bi-save"></i> Guardar
+                            <i class="bi bi-save"></i>
                         </button>
                     </td>
                 </form>
@@ -93,7 +113,7 @@
 </div>
 
 <!-- ==========================================
-     SCRIPT: FILTRO, IMPRESIÓN Y DECIMALES
+     SCRIPT COMPLETO
      ========================================== -->
 <script>
 // ==========================================
@@ -113,8 +133,14 @@ document.getElementById('filtroBusqueda').addEventListener('keyup', function() {
             contador++;
         } else {
             fila.style.display = 'none';
+            // Desmarcar si está oculto
+            const checkbox = fila.querySelector('.checkbox-participante');
+            if (checkbox) checkbox.checked = false;
         }
     });
+    
+    actualizarContador();
+    actualizarCheckboxTodos();
     
     // Mostrar mensaje si no hay resultados
     let mensaje = document.getElementById('mensajeSinResultados');
@@ -122,7 +148,7 @@ document.getElementById('filtroBusqueda').addEventListener('keyup', function() {
         if (!mensaje) {
             mensaje = document.createElement('tr');
             mensaje.id = 'mensajeSinResultados';
-            mensaje.innerHTML = `<td colspan="8" class="text-center text-muted py-3">
+            mensaje.innerHTML = `<td colspan="9" class="text-center text-muted py-3">
                 <i class="bi bi-search"></i> No se encontraron coincidencias
             </td>`;
             document.querySelector('#tablaCalificaciones tbody').appendChild(mensaje);
@@ -141,14 +167,65 @@ function limpiarFiltro() {
 }
 
 // ==========================================
-// 2. DECIMALES EXACTOS CON 2 DÍGITOS
+// 2. CONTADOR Y SELECCIÓN
+// ==========================================
+function actualizarContador() {
+    const checkboxes = document.querySelectorAll('.checkbox-participante:checked');
+    const total = checkboxes.length;
+    const contadorDiv = document.getElementById('contadorSeleccionados');
+    const numeroSpan = document.getElementById('numeroSeleccionados');
+    
+    if (total > 0) {
+        contadorDiv.style.display = 'block';
+        numeroSpan.textContent = total;
+    } else {
+        contadorDiv.style.display = 'none';
+    }
+    
+    actualizarCheckboxTodos();
+}
+
+function toggleSeleccionarTodos(checkbox) {
+    const filas = document.querySelectorAll('.fila-participante');
+    filas.forEach(fila => {
+        if (fila.style.display !== 'none') {
+            const cb = fila.querySelector('.checkbox-participante');
+            if (cb) cb.checked = checkbox.checked;
+        }
+    });
+    actualizarContador();
+}
+
+function actualizarCheckboxTodos() {
+    const checkboxes = document.querySelectorAll('.checkbox-participante:checked');
+    const totalCheckboxes = document.querySelectorAll('.checkbox-participante').length;
+    const checkboxTodos = document.getElementById('seleccionarTodosCheckbox');
+    
+    if (checkboxTodos) {
+        checkboxTodos.checked = checkboxes.length === totalCheckboxes && totalCheckboxes > 0;
+    }
+}
+
+function seleccionarTodos() {
+    const checkboxTodos = document.getElementById('seleccionarTodosCheckbox');
+    checkboxTodos.checked = true;
+    toggleSeleccionarTodos(checkboxTodos);
+}
+
+function deseleccionarTodos() {
+    const checkboxTodos = document.getElementById('seleccionarTodosCheckbox');
+    checkboxTodos.checked = false;
+    toggleSeleccionarTodos(checkboxTodos);
+}
+
+// ==========================================
+// 3. DECIMALES EXACTOS CON 2 DÍGITOS
 // ==========================================
 function formatearNumero(valor) {
     if (isNaN(valor)) return '0.00';
     return parseFloat(valor).toFixed(2);
 }
 
-// Al cargar la página, formatear todos los promedios
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.puntaje-total').forEach(el => {
         const texto = el.textContent.trim();
@@ -158,7 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Al calcular promedio, formatear con 2 decimales
 document.querySelectorAll('.calificacion').forEach(input => {
     input.addEventListener('input', function() {
         const row = this.closest('tr');
@@ -171,34 +247,22 @@ document.querySelectorAll('.calificacion').forEach(input => {
 });
 
 // ==========================================
-// 3. IMPRIMIR / PDF (SOLO FILTRADOS)
+// 4. IMPRIMIR SOLO SELECCIONADOS
 // ==========================================
-function imprimirTabla() {
-    const filtro = document.getElementById('filtroBusqueda').value.toLowerCase().trim();
-    const filas = document.querySelectorAll('.fila-participante');
-    let hayFilasVisibles = false;
+function imprimirSeleccionados() {
+    const seleccionados = document.querySelectorAll('.checkbox-participante:checked');
     
-    // Verificar si hay filas visibles
-    filas.forEach(fila => {
-        if (fila.style.display !== 'none') {
-            hayFilasVisibles = true;
-        }
-    });
-    
-    if (!hayFilasVisibles) {
-        alert('No hay datos para imprimir. Prueba limpiar el filtro.');
+    if (seleccionados.length === 0) {
+        alert('Selecciona al menos un participante para imprimir.');
         return;
     }
     
-    // Ocultar botones y filtros para impresión
-    const originalTitle = document.title;
-    document.title = 'Calificaciones - Concurso de Danzas';
+    const idsSeleccionados = Array.from(seleccionados).map(cb => cb.getAttribute('data-id'));
+    const filas = document.querySelectorAll('.fila-participante');
     
-    // Crear ventana de impresión
     const ventana = window.open('', '_blank', 'width=1000,height=800');
-    ventana.document.write('<html><head><title>Calificaciones - Concurso de Danzas</title>');
+    ventana.document.write('<html><head><title>Calificaciones Seleccionadas</title>');
     ventana.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
-    ventana.document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">');
     ventana.document.write(`
         <style>
             body { padding: 20px; font-family: Arial, sans-serif; }
@@ -212,24 +276,17 @@ function imprimirTabla() {
             .text-center { text-align: center; }
             .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
             .print-footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 10px; }
-            .no-print { display: none; }
-            @media print { .no-print { display: none; } }
         </style>
     `);
     ventana.document.write('</head><body>');
     
-    // Encabezado
     ventana.document.write(`
         <div class="print-header">
             <h1>🏆 JULLULLUMA RAIMI 2026</h1>
-            <h4>REGISTRO DE CALIFICACIONES</h4>
+            <h4>CALIFICACIONES SELECCIONADAS</h4>
             <p>Fecha: ${new Date().toLocaleString()}</p>
-            ${filtro ? `<p><strong>Filtro aplicado:</strong> "${filtro}"</p>` : ''}
+            <p><strong>Total seleccionados:</strong> ${seleccionados.length}</p>
         </div>
-    `);
-    
-    // Tabla
-    ventana.document.write(`
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -245,10 +302,10 @@ function imprimirTabla() {
             <tbody>
     `);
     
-    // Solo filas visibles (filtradas)
     filas.forEach(fila => {
-        if (fila.style.display !== 'none') {
-            const categoria = fila.querySelector('td:first-child .badge')?.textContent?.trim() || '';
+        const id = fila.getAttribute('data-id');
+        if (idsSeleccionados.includes(id)) {
+            const categoria = fila.querySelector('td:nth-child(2) .badge')?.textContent?.trim() || '';
             const institucion = fila.querySelector('.texto-institucion')?.textContent?.trim() || '';
             const danza = fila.querySelector('.texto-danza')?.textContent?.trim() || '';
             const jurado1 = fila.querySelector('[name="jurado1"]')?.value || '0';
@@ -271,40 +328,42 @@ function imprimirTabla() {
     });
     
     ventana.document.write('</tbody></table>');
-    
-    // Footer
     ventana.document.write(`
         <div class="print-footer">
             <p>Municipalidad Distrital de Santa Rosa - Concurso de Danzas</p>
             <p>Resultados calculados con el promedio de los 3 jurados</p>
         </div>
-        <div class="no-print text-center mt-3">
+        <div class="text-center mt-3">
             <button onclick="window.print()" class="btn btn-primary">🖨️ Imprimir</button>
             <button onclick="window.close()" class="btn btn-secondary">Cerrar</button>
         </div>
     `);
-    
     ventana.document.write('</body></html>');
     ventana.document.close();
     
-    // Esperar a que cargue y luego imprimir automáticamente
-    setTimeout(() => {
-        ventana.print();
-    }, 500);
+    setTimeout(() => ventana.print(), 500);
 }
 
 // ==========================================
-// 4. EXPORTAR EXCEL (SOLO FILTRADOS)
+// 5. EXPORTAR EXCEL SOLO SELECCIONADOS
 // ==========================================
-function exportarExcelFiltrado() {
-    const filtro = document.getElementById('filtroBusqueda').value.toLowerCase().trim();
+function exportarSeleccionados() {
+    const seleccionados = document.querySelectorAll('.checkbox-participante:checked');
+    
+    if (seleccionados.length === 0) {
+        alert('Selecciona al menos un participante para exportar.');
+        return;
+    }
+    
+    const idsSeleccionados = Array.from(seleccionados).map(cb => cb.getAttribute('data-id'));
     const filas = document.querySelectorAll('.fila-participante');
     let datos = [];
     let encabezados = ['Categoría', 'Institución', 'Danza', 'Jurado 1', 'Jurado 2', 'Jurado 3', 'Promedio'];
     
     filas.forEach(fila => {
-        if (fila.style.display !== 'none') {
-            const categoria = fila.querySelector('td:first-child .badge')?.textContent?.trim() || '';
+        const id = fila.getAttribute('data-id');
+        if (idsSeleccionados.includes(id)) {
+            const categoria = fila.querySelector('td:nth-child(2) .badge')?.textContent?.trim() || '';
             const institucion = fila.querySelector('.texto-institucion')?.textContent?.trim() || '';
             const danza = fila.querySelector('.texto-danza')?.textContent?.trim() || '';
             const jurado1 = parseFloat(fila.querySelector('[name="jurado1"]')?.value || 0).toFixed(2);
@@ -317,26 +376,42 @@ function exportarExcelFiltrado() {
     });
     
     if (datos.length === 0) {
-        alert('No hay datos para exportar. Prueba limpiar el filtro.');
+        alert('No hay datos para exportar.');
         return;
     }
     
-    // Crear CSV
     let csv = encabezados.join(',') + '\n';
     datos.forEach(fila => {
         csv += fila.join(',') + '\n';
     });
     
-    // Descargar
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `calificaciones_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `calificaciones_seleccionadas_${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+}
+
+// ==========================================
+// 6. ELIMINAR SELECCIONADOS (Confirmación)
+// ==========================================
+function eliminarSeleccionados() {
+    const seleccionados = document.querySelectorAll('.checkbox-participante:checked');
+    
+    if (seleccionados.length === 0) {
+        alert('Selecciona al menos un participante para eliminar.');
+        return;
+    }
+    
+    if (confirm(`¿Estás seguro de eliminar ${seleccionados.length} participante(s)? Esta acción no se puede deshacer.`)) {
+        const ids = Array.from(seleccionados).map(cb => cb.getAttribute('data-id'));
+        // Redirigir con los IDs seleccionados
+        window.location.href = `{{ url_for('eliminar_seleccionados') }}?ids=${ids.join(',')}`;
+    }
 }
 </script>
 {% endblock %}

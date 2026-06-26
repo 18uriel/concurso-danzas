@@ -220,7 +220,7 @@ def guardar_calificacion(participante_id):
     jurado2 = float(request.form['jurado2'])
     jurado3 = float(request.form['jurado3'])
     
-    puntaje_total = (jurado1 + jurado2 + jurado3) / 3
+    # ✅ NO calcular puntaje_total, PostgreSQL lo hará automáticamente
     
     conn = get_db_connection()
     if conn is None:
@@ -233,16 +233,18 @@ def guardar_calificacion(participante_id):
     existe = cur.fetchone()
     
     if existe:
+        # ✅ SIN puntaje_total en UPDATE
         cur.execute("""
             UPDATE calificaciones 
-            SET jurado1 = %s, jurado2 = %s, jurado3 = %s, puntaje_total = %s
+            SET jurado1 = %s, jurado2 = %s, jurado3 = %s
             WHERE participante_id = %s
-        """, (jurado1, jurado2, jurado3, puntaje_total, participante_id))
+        """, (jurado1, jurado2, jurado3, participante_id))
     else:
+        # ✅ SIN puntaje_total en INSERT
         cur.execute("""
-            INSERT INTO calificaciones (participante_id, jurado1, jurado2, jurado3, puntaje_total) 
-            VALUES (%s, %s, %s, %s, %s)
-        """, (participante_id, jurado1, jurado2, jurado3, puntaje_total))
+            INSERT INTO calificaciones (participante_id, jurado1, jurado2, jurado3) 
+            VALUES (%s, %s, %s, %s)
+        """, (participante_id, jurado1, jurado2, jurado3))
     
     conn.commit()
     cur.close()
@@ -275,7 +277,7 @@ def resultados():
                 c.jurado2,
                 c.jurado3,
                 c.puntaje_total,
-                RANK() OVER (ORDER BY c.puntaje_total DESC) as posicion
+                ROW_NUMBER() OVER (ORDER BY c.puntaje_total DESC) as posicion
             FROM participantes p
             INNER JOIN calificaciones c ON p.id = c.participante_id
             WHERE p.categoria = %s
@@ -307,7 +309,7 @@ def resultados_publicos():
                 c.jurado2,
                 c.jurado3,
                 c.puntaje_total,
-                RANK() OVER (ORDER BY c.puntaje_total DESC) as posicion
+                ROW_NUMBER() OVER (ORDER BY c.puntaje_total DESC) as posicion
             FROM participantes p
             INNER JOIN calificaciones c ON p.id = c.participante_id
             WHERE p.categoria = %s
@@ -352,7 +354,7 @@ def reporte():
             c.jurado2,
             c.jurado3,
             c.puntaje_total,
-            RANK() OVER (PARTITION BY p.categoria ORDER BY c.puntaje_total DESC) as posicion
+            ROW_NUMBER() OVER (PARTITION BY p.categoria ORDER BY c.puntaje_total DESC) as posicion
         FROM participantes p
         INNER JOIN calificaciones c ON p.id = c.participante_id
         ORDER BY p.categoria, c.puntaje_total DESC
@@ -384,7 +386,7 @@ def exportar_excel():
             c.jurado2 as "Jurado 2",
             c.jurado3 as "Jurado 3",
             c.puntaje_total as "Promedio",
-            RANK() OVER (PARTITION BY p.categoria ORDER BY c.puntaje_total DESC) as "Posición"
+            ROW_NUMBER() OVER (PARTITION BY p.categoria ORDER BY c.puntaje_total DESC) as "Posición"
         FROM participantes p
         INNER JOIN calificaciones c ON p.id = c.participante_id
         ORDER BY p.categoria, c.puntaje_total DESC

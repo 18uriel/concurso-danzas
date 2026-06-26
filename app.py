@@ -187,6 +187,40 @@ def eliminar_participante(id):
     flash('Participante eliminado exitosamente', 'success')
     return redirect(url_for('participantes'))
 
+# ==================== ELIMINAR SELECCIONADOS ====================
+@app.route('/eliminar/seleccionados')
+def eliminar_seleccionados():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    
+    ids_param = request.args.get('ids', '')
+    if not ids_param:
+        flash('No se seleccionaron participantes', 'warning')
+        return redirect(url_for('calificaciones'))
+    
+    ids = ids_param.split(',')
+    conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('calificaciones'))
+    
+    cur = conn.cursor()
+    
+    # Primero eliminar calificaciones relacionadas
+    for id in ids:
+        cur.execute("DELETE FROM calificaciones WHERE participante_id = %s", (id,))
+    
+    # Luego eliminar participantes
+    for id in ids:
+        cur.execute("DELETE FROM participantes WHERE id = %s", (id,))
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    flash(f'{len(ids)} participantes eliminados exitosamente', 'success')
+    return redirect(url_for('calificaciones'))
+
 # ==================== CALIFICACIONES ====================
 @app.route('/calificaciones')
 def calificaciones():
@@ -220,8 +254,6 @@ def guardar_calificacion(participante_id):
     jurado2 = float(request.form['jurado2'])
     jurado3 = float(request.form['jurado3'])
     
-    # ✅ NO calcular puntaje_total, PostgreSQL lo hará automáticamente
-    
     conn = get_db_connection()
     if conn is None:
         flash('Error de conexión a la base de datos', 'danger')
@@ -233,14 +265,12 @@ def guardar_calificacion(participante_id):
     existe = cur.fetchone()
     
     if existe:
-        # ✅ SIN puntaje_total en UPDATE
         cur.execute("""
             UPDATE calificaciones 
             SET jurado1 = %s, jurado2 = %s, jurado3 = %s
             WHERE participante_id = %s
         """, (jurado1, jurado2, jurado3, participante_id))
     else:
-        # ✅ SIN puntaje_total en INSERT
         cur.execute("""
             INSERT INTO calificaciones (participante_id, jurado1, jurado2, jurado3) 
             VALUES (%s, %s, %s, %s)

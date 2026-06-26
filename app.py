@@ -1,6 +1,9 @@
-# app.py - Versión con PyMySQL
+# app.py - Versión para PostgreSQL
 import pymysql
 pymysql.install_as_MySQLdb()
+
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
 from flask_mysqldb import MySQL
@@ -8,9 +11,22 @@ from config import Config
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Configuración para PostgreSQL
+def get_db_connection():
+    conn = psycopg2.connect(
+        host=app.config['MYSQL_HOST'],
+        port=app.config['MYSQL_PORT'],
+        user=app.config['MYSQL_USER'],
+        password=app.config['MYSQL_PASSWORD'],
+        database=app.config['MYSQL_DB'],
+        cursor_factory=RealDictCursor
+    )
+    return conn
 
 mysql = MySQL(app)
 
@@ -21,10 +37,12 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
-        cur = mysql.connection.cursor()
+        conn = get_db_connection()
+        cur = conn.cursor()
         cur.execute("SELECT * FROM usuarios WHERE username = %s AND password = %s", (username, password))
         user = cur.fetchone()
         cur.close()
+        conn.close()
         
         if user:
             session['logged_in'] = True
@@ -42,7 +60,8 @@ def dashboard():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     
     cur.execute("SELECT COUNT(*) as total FROM participantes")
     total_participantes = cur.fetchone()['total']
@@ -57,6 +76,7 @@ def dashboard():
     promedio_general = cur.fetchone()['promedio'] or 0
     
     cur.close()
+    conn.close()
     
     return render_template('dashboard.html', 
                          total_participantes=total_participantes,
@@ -70,10 +90,12 @@ def participantes():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM participantes ORDER BY id DESC")
     participantes = cur.fetchall()
     cur.close()
+    conn.close()
     
     return render_template('participantes.html', participantes=participantes)
 
@@ -86,13 +108,15 @@ def agregar_participante():
     nombre_danza = request.form['nombre_danza']
     categoria = request.form['categoria']
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("""
         INSERT INTO participantes (nombre_institucion, nombre_danza, categoria) 
         VALUES (%s, %s, %s)
     """, (nombre_institucion, nombre_danza, categoria))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
     
     flash('Participante registrado exitosamente', 'success')
     return redirect(url_for('participantes'))
@@ -106,14 +130,16 @@ def editar_participante(id):
     nombre_danza = request.form['nombre_danza']
     categoria = request.form['categoria']
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("""
         UPDATE participantes 
         SET nombre_institucion = %s, nombre_danza = %s, categoria = %s 
         WHERE id = %s
     """, (nombre_institucion, nombre_danza, categoria, id))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
     
     flash('Participante actualizado exitosamente', 'success')
     return redirect(url_for('participantes'))
@@ -123,10 +149,12 @@ def eliminar_participante(id):
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("DELETE FROM participantes WHERE id = %s", (id,))
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
     
     flash('Participante eliminado exitosamente', 'success')
     return redirect(url_for('participantes'))
@@ -137,7 +165,8 @@ def calificaciones():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("""
         SELECT p.*, c.id as calificacion_id, c.jurado1, c.jurado2, c.jurado3, c.puntaje_total 
         FROM participantes p
@@ -146,6 +175,7 @@ def calificaciones():
     """)
     participantes = cur.fetchall()
     cur.close()
+    conn.close()
     
     return render_template('calificaciones.html', participantes=participantes)
 
@@ -158,10 +188,10 @@ def guardar_calificacion(participante_id):
     jurado2 = float(request.form['jurado2'])
     jurado3 = float(request.form['jurado3'])
     
-    # Calcular el promedio
     puntaje_total = (jurado1 + jurado2 + jurado3) / 3
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     
     cur.execute("SELECT id FROM calificaciones WHERE participante_id = %s", (participante_id,))
     existe = cur.fetchone()
@@ -178,8 +208,9 @@ def guardar_calificacion(participante_id):
             VALUES (%s, %s, %s, %s, %s)
         """, (participante_id, jurado1, jurado2, jurado3, puntaje_total))
     
-    mysql.connection.commit()
+    conn.commit()
     cur.close()
+    conn.close()
     
     flash('Calificación guardada exitosamente', 'success')
     return redirect(url_for('calificaciones'))
@@ -190,7 +221,8 @@ def resultados():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     
     resultados = {}
     for categoria in ['A', 'B']:
@@ -212,12 +244,14 @@ def resultados():
         resultados[categoria] = cur.fetchall()
     
     cur.close()
+    conn.close()
     return render_template('resultados.html', resultados=resultados)
 
 # ==================== RESULTADOS PUBLICOS ====================
 @app.route('/resultados/publicos')
 def resultados_publicos():
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     
     resultados = {}
     for categoria in ['A', 'B']:
@@ -239,42 +273,16 @@ def resultados_publicos():
         resultados[categoria] = cur.fetchall()
     
     cur.close()
+    conn.close()
     
     now = datetime.now()
     
     # ==========================================
     # 🖼️ CONFIGURACIÓN DE IMÁGENES
     # ==========================================
-    
-    # === FONDO DE PANTALLA ===
-    # Opción 1: Imagen local (coloca tu imagen en static/images/)
     fondo_url = '/static/images/fondo_bicentenario.jpg'
-    
-    # Opción 2: URL externa (descomenta y usa esta)
-    # fondo_url = 'https://ejemplo.com/mi-fondo.jpg'
-    
-    # Opción 3: Sin fondo (solo color)
-    # fondo_url = ''
-    
-    # === LOGO IZQUIERDA ===
-    # Opción 1: Imagen local
     logo_izquierda = '/static/images/logo_municipalidad.png'
-    
-    # Opción 2: URL externa
-    # logo_izquierda = 'https://ejemplo.com/logo-izquierda.png'
-    
-    # Opción 3: Sin logo
-    # logo_izquierda = ''
-    
-    # === LOGO DERECHA ===
-    # Opción 1: Imagen local
     logo_derecha = '/static/images/logo_bicentenario.png'
-    
-    # Opción 2: URL externa
-    # logo_derecha = 'https://ejemplo.com/logo-derecha.png'
-    
-    # Opción 3: Sin logo
-    # logo_derecha = ''
     
     return render_template('resultados_publicos.html', 
                          resultados=resultados, 
@@ -289,7 +297,8 @@ def reporte():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("""
         SELECT 
             p.categoria,
@@ -306,6 +315,7 @@ def reporte():
     """)
     reporte_data = cur.fetchall()
     cur.close()
+    conn.close()
     
     return render_template('reporte.html', reporte=reporte_data)
 
@@ -315,7 +325,8 @@ def exportar_excel():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
     
-    cur = mysql.connection.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
     cur.execute("""
         SELECT 
             p.categoria as 'Categoría',
@@ -332,6 +343,7 @@ def exportar_excel():
     """)
     data = cur.fetchall()
     cur.close()
+    conn.close()
     
     df = pd.DataFrame(data)
     
@@ -369,4 +381,5 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)

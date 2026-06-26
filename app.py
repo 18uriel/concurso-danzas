@@ -1,34 +1,38 @@
-# app.py - Versión para PostgreSQL
-import pymysql
-pymysql.install_as_MySQLdb()
-
+# app.py - Versión pura para PostgreSQL (sin flask_mysqldb)
 import psycopg2
 from psycopg2.extras import RealDictCursor
-
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file
-from flask_mysqldb import MySQL
-from config import Config
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file
 import pandas as pd
 from io import BytesIO
 from datetime import datetime
 import os
 
 app = Flask(__name__)
-app.config.from_object(Config)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-for-development')
 
-# Configuración para PostgreSQL
+# Configuración de la base de datos desde variables de entorno
+DB_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+DB_PORT = os.environ.get('MYSQL_PORT', '5432')
+DB_USER = os.environ.get('MYSQL_USER', 'postgres')
+DB_PASSWORD = os.environ.get('MYSQL_PASSWORD', '')
+DB_NAME = os.environ.get('MYSQL_DB', 'concurso_danzas')
+
 def get_db_connection():
-    conn = psycopg2.connect(
-        host=app.config['MYSQL_HOST'],
-        port=app.config['MYSQL_PORT'],
-        user=app.config['MYSQL_USER'],
-        password=app.config['MYSQL_PASSWORD'],
-        database=app.config['MYSQL_DB'],
-        cursor_factory=RealDictCursor
-    )
-    return conn
-
-mysql = MySQL(app)
+    """Conecta a la base de datos PostgreSQL"""
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            cursor_factory=RealDictCursor,
+            connect_timeout=10
+        )
+        return conn
+    except Exception as e:
+        print(f"Error de conexión a la base de datos: {e}")
+        return None
 
 # ==================== LOGIN ====================
 @app.route('/', methods=['GET', 'POST'])
@@ -38,6 +42,10 @@ def login():
         password = request.form['password']
         
         conn = get_db_connection()
+        if conn is None:
+            flash('Error de conexión a la base de datos', 'danger')
+            return render_template('login.html')
+            
         cur = conn.cursor()
         cur.execute("SELECT * FROM usuarios WHERE username = %s AND password = %s", (username, password))
         user = cur.fetchone()
@@ -61,6 +69,10 @@ def dashboard():
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('login'))
+        
     cur = conn.cursor()
     
     cur.execute("SELECT COUNT(*) as total FROM participantes")
@@ -72,8 +84,8 @@ def dashboard():
     cur.execute("SELECT COUNT(*) as total FROM calificaciones")
     total_calificaciones = cur.fetchone()['total']
     
-    cur.execute("SELECT AVG(puntaje_total) as promedio FROM calificaciones")
-    promedio_general = cur.fetchone()['promedio'] or 0
+    cur.execute("SELECT COALESCE(AVG(puntaje_total), 0) as promedio FROM calificaciones")
+    promedio_general = cur.fetchone()['promedio']
     
     cur.close()
     conn.close()
@@ -91,6 +103,10 @@ def participantes():
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('login'))
+        
     cur = conn.cursor()
     cur.execute("SELECT * FROM participantes ORDER BY id DESC")
     participantes = cur.fetchall()
@@ -109,6 +125,10 @@ def agregar_participante():
     categoria = request.form['categoria']
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('participantes'))
+        
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO participantes (nombre_institucion, nombre_danza, categoria) 
@@ -131,6 +151,10 @@ def editar_participante(id):
     categoria = request.form['categoria']
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('participantes'))
+        
     cur = conn.cursor()
     cur.execute("""
         UPDATE participantes 
@@ -150,6 +174,10 @@ def eliminar_participante(id):
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('participantes'))
+        
     cur = conn.cursor()
     cur.execute("DELETE FROM participantes WHERE id = %s", (id,))
     conn.commit()
@@ -166,6 +194,10 @@ def calificaciones():
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('login'))
+        
     cur = conn.cursor()
     cur.execute("""
         SELECT p.*, c.id as calificacion_id, c.jurado1, c.jurado2, c.jurado3, c.puntaje_total 
@@ -191,6 +223,10 @@ def guardar_calificacion(participante_id):
     puntaje_total = (jurado1 + jurado2 + jurado3) / 3
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('calificaciones'))
+        
     cur = conn.cursor()
     
     cur.execute("SELECT id FROM calificaciones WHERE participante_id = %s", (participante_id,))
@@ -222,6 +258,10 @@ def resultados():
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('login'))
+        
     cur = conn.cursor()
     
     resultados = {}
@@ -251,6 +291,9 @@ def resultados():
 @app.route('/resultados/publicos')
 def resultados_publicos():
     conn = get_db_connection()
+    if conn is None:
+        return "Error de conexión a la base de datos", 500
+        
     cur = conn.cursor()
     
     resultados = {}
@@ -277,9 +320,6 @@ def resultados_publicos():
     
     now = datetime.now()
     
-    # ==========================================
-    # 🖼️ CONFIGURACIÓN DE IMÁGENES
-    # ==========================================
     fondo_url = '/static/images/fondo_bicentenario.jpg'
     logo_izquierda = '/static/images/logo_municipalidad.png'
     logo_derecha = '/static/images/logo_bicentenario.png'
@@ -298,6 +338,10 @@ def reporte():
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('login'))
+        
     cur = conn.cursor()
     cur.execute("""
         SELECT 
@@ -326,17 +370,21 @@ def exportar_excel():
         return redirect(url_for('login'))
     
     conn = get_db_connection()
+    if conn is None:
+        flash('Error de conexión a la base de datos', 'danger')
+        return redirect(url_for('dashboard'))
+        
     cur = conn.cursor()
     cur.execute("""
         SELECT 
-            p.categoria as 'Categoría',
-            p.nombre_institucion as 'Institución',
-            p.nombre_danza as 'Danza',
-            c.jurado1 as 'Jurado 1',
-            c.jurado2 as 'Jurado 2',
-            c.jurado3 as 'Jurado 3',
-            c.puntaje_total as 'Promedio',
-            RANK() OVER (PARTITION BY p.categoria ORDER BY c.puntaje_total DESC) as 'Posición'
+            p.categoria as "Categoría",
+            p.nombre_institucion as "Institución",
+            p.nombre_danza as "Danza",
+            c.jurado1 as "Jurado 1",
+            c.jurado2 as "Jurado 2",
+            c.jurado3 as "Jurado 3",
+            c.puntaje_total as "Promedio",
+            RANK() OVER (PARTITION BY p.categoria ORDER BY c.puntaje_total DESC) as "Posición"
         FROM participantes p
         INNER JOIN calificaciones c ON p.id = c.participante_id
         ORDER BY p.categoria, c.puntaje_total DESC

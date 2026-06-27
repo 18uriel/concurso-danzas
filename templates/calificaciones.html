@@ -25,13 +25,13 @@
             <i class="bi bi-x-circle"></i> Deseleccionar
         </button>
         <button class="btn btn-sm btn-primary" onclick="imprimirSeleccionados()">
-            <i class="bi bi-printer"></i> Imprimir selección
+            <i class="bi bi-printer"></i> Imprimir
         </button>
         <button class="btn btn-sm btn-success" onclick="exportarSeleccionados()">
-            <i class="bi bi-file-excel"></i> Excel selección
+            <i class="bi bi-file-excel"></i> Excel
         </button>
-        <button class="btn btn-sm btn-warning" onclick="eliminarSeleccionados()">
-            <i class="bi bi-trash"></i> Eliminar selección
+        <button class="btn btn-sm btn-danger" onclick="eliminarSeleccionados()">
+            <i class="bi bi-trash"></i> Eliminar
         </button>
     </div>
 </div>
@@ -133,7 +133,6 @@ document.getElementById('filtroBusqueda').addEventListener('keyup', function() {
             contador++;
         } else {
             fila.style.display = 'none';
-            // Desmarcar si está oculto
             const checkbox = fila.querySelector('.checkbox-participante');
             if (checkbox) checkbox.checked = false;
         }
@@ -142,7 +141,6 @@ document.getElementById('filtroBusqueda').addEventListener('keyup', function() {
     actualizarContador();
     actualizarCheckboxTodos();
     
-    // Mostrar mensaje si no hay resultados
     let mensaje = document.getElementById('mensajeSinResultados');
     if (contador === 0) {
         if (!mensaje) {
@@ -247,7 +245,7 @@ document.querySelectorAll('.calificacion').forEach(input => {
 });
 
 // ==========================================
-// 4. IMPRIMIR SOLO SELECCIONADOS
+// 4. IMPRIMIR SELECCIONADOS (SIN TEXTO NO DESEADO)
 // ==========================================
 function imprimirSeleccionados() {
     const seleccionados = document.querySelectorAll('.checkbox-participante:checked');
@@ -283,9 +281,8 @@ function imprimirSeleccionados() {
     ventana.document.write(`
         <div class="print-header">
             <h1>🏆 JULLULLUMA RAIMI 2026</h1>
-            <h4>CALIFICACIONES SELECCIONADAS</h4>
+            <h4>CALIFICACION</h4>
             <p>Fecha: ${new Date().toLocaleString()}</p>
-            <p><strong>Total seleccionados:</strong> ${seleccionados.length}</p>
         </div>
         <table class="table table-striped">
             <thead>
@@ -331,7 +328,6 @@ function imprimirSeleccionados() {
     ventana.document.write(`
         <div class="print-footer">
             <p>Municipalidad Distrital de Santa Rosa - Concurso de Danzas</p>
-            <p>Resultados calculados con el promedio de los 3 jurados</p>
         </div>
         <div class="text-center mt-3">
             <button onclick="window.print()" class="btn btn-primary">🖨️ Imprimir</button>
@@ -409,7 +405,6 @@ function eliminarSeleccionados() {
     
     if (confirm(`¿Estás seguro de eliminar ${seleccionados.length} participante(s)? Esta acción no se puede deshacer.`)) {
         const ids = Array.from(seleccionados).map(cb => cb.getAttribute('data-id'));
-        // Redirigir con los IDs seleccionados
         window.location.href = `{{ url_for('eliminar_seleccionados') }}?ids=${ids.join(',')}`;
     }
 }
